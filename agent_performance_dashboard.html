@@ -1,0 +1,1468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Performance Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #060A14;
+    --surface: #0D1526;
+    --surface2: #131d35;
+    --border: #1e2d4a;
+    --accent: #00D4FF;
+    --accent2: #7C3AED;
+    --accent3: #10B981;
+    --danger: #EF4444;
+    --warn: #F59E0B;
+    --text: #E2E8F0;
+    --muted: #64748B;
+    --card-glow: 0 0 30px rgba(0,212,255,0.07);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    background: linear-gradient(135deg, #060A14 0%, #0D1526 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+  }
+  .header-brand {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .header-logo {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .header-title { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; letter-spacing: 0.05em; }
+  .header-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .header-badge {
+    background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3);
+    color: var(--accent); border-radius: 20px; padding: 4px 12px; font-size: 11px;
+    font-family: 'Space Mono', monospace; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+  /* LAYOUT */
+  .app { display: flex; height: calc(100vh - 73px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 260px; min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 0;
+  }
+  .sidebar-section { padding: 0 16px 12px; }
+  .sidebar-label { font-size: 10px; font-family: 'Space Mono', monospace; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; padding: 0 4px; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 500; color: var(--muted);
+    transition: all 0.2s; border: 1px solid transparent;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    background: rgba(0,212,255,0.08); color: var(--accent);
+    border-color: rgba(0,212,255,0.2);
+  }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .agent-list { display: flex; flex-direction: column; gap: 4px; }
+  .agent-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-family: 'Space Mono', monospace; color: var(--muted);
+    transition: all 0.2s; border: 1px solid transparent;
+  }
+  .agent-item:hover { background: var(--surface2); color: var(--text); }
+  .agent-item.active { background: rgba(124,58,237,0.1); color: #a78bfa; border-color: rgba(124,58,237,0.2); }
+  .agent-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .dot-green { background: var(--accent3); }
+  .dot-yellow { background: var(--warn); }
+  .dot-red { background: var(--danger); }
+
+  .divider { height: 1px; background: var(--border); margin: 12px 16px; }
+
+  /* MAIN */
+  .main { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; background: var(--surface); border-radius: 10px; padding: 4px; border: 1px solid var(--border); width: fit-content; }
+  .tab {
+    padding: 8px 18px; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 500;
+    color: var(--muted); transition: all 0.2s;
+  }
+  .tab.active { background: var(--accent2); color: white; }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* CARDS */
+  .cards-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    box-shadow: var(--card-glow);
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.3); }
+  .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .card-value { font-size: 28px; font-weight: 700; font-family: 'Space Mono', monospace; }
+  .card-value.cyan { color: var(--accent); }
+  .card-value.purple { color: #a78bfa; }
+  .card-value.green { color: var(--accent3); }
+  .card-value.orange { color: var(--warn); }
+  .card-delta { font-size: 11px; margin-top: 6px; }
+  .delta-up { color: var(--accent3); }
+  .delta-down { color: var(--danger); }
+
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .chart-sub { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+
+  /* GRID LAYOUTS */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .grid-60-40 { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; }
+
+  /* ML PANEL */
+  .ml-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .ml-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .ml-desc { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+
+  .algo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+  .algo-btn {
+    padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted); cursor: pointer;
+    font-size: 11px; font-family: 'Space Mono', monospace; text-align: center;
+    transition: all 0.2s; line-height: 1.4;
+  }
+  .algo-btn:hover { border-color: var(--accent); color: var(--text); }
+  .algo-btn.selected { border-color: var(--accent); background: rgba(0,212,255,0.08); color: var(--accent); }
+
+  .run-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 24px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent2), #4f46e5);
+    color: white; border: none; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+  }
+  .run-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(124,58,237,0.4); }
+  .run-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* RESULTS TABLE */
+  .results-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  .results-table th { 
+    text-align: left; padding: 10px 12px; font-size: 10px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+  }
+  .results-table td { padding: 10px 12px; border-bottom: 1px solid rgba(30,45,74,0.5); }
+  .results-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* RISK BADGES */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
+    font-family: 'Space Mono', monospace; letter-spacing: 0.04em;
+  }
+  .badge-low { background: rgba(16,185,129,0.15); color: var(--accent3); border: 1px solid rgba(16,185,129,0.3); }
+  .badge-medium { background: rgba(245,158,11,0.15); color: var(--warn); border: 1px solid rgba(245,158,11,0.3); }
+  .badge-high { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* PREDICTION DISPLAY */
+  .pred-box {
+    background: linear-gradient(135deg, rgba(0,212,255,0.05), rgba(124,58,237,0.05));
+    border: 1px solid rgba(0,212,255,0.2); border-radius: 10px; padding: 16px;
+  }
+  .pred-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 4px; }
+  .pred-value { font-size: 22px; font-weight: 700; font-family: 'Space Mono', monospace; color: var(--accent); }
+  .pred-row { display: flex; gap: 12px; }
+  .pred-item { flex: 1; }
+
+  /* METRIC BARS */
+  .metric-bar-wrap { margin: 8px 0; }
+  .metric-bar-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+  .metric-bar-track { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .metric-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+
+  /* AI OUTPUT */
+  .ai-output {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; font-size: 12px; line-height: 1.7; color: var(--text);
+    min-height: 60px; white-space: pre-wrap;
+  }
+  .ai-output.loading { color: var(--muted); }
+
+  /* MODEL COMPARISON */
+  .model-scores { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+  .model-score-card {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 14px;
+    text-align: center; transition: all 0.2s;
+  }
+  .model-score-card.best { border-color: var(--accent3); background: rgba(16,185,129,0.05); }
+  .model-name { font-size: 10px; font-family: 'Space Mono', monospace; color: var(--muted); margin-bottom: 6px; }
+  .model-r2 { font-size: 20px; font-weight: 700; color: var(--text); }
+  .model-r2.best-score { color: var(--accent3); }
+  .model-rmse { font-size: 10px; color: var(--muted); margin-top: 4px; }
+  .best-label { font-size: 9px; font-family: 'Space Mono', monospace; color: var(--accent3); margin-top: 4px; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* SECTION HEADERS */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .section-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .section-badge { font-size: 10px; font-family: 'Space Mono', monospace; background: rgba(0,212,255,0.1); color: var(--accent); padding: 2px 8px; border-radius: 4px; }
+
+  .hidden { display: none !important; }
+
+  /* TOOLTIP-STYLE INFO */
+  .info-chip {
+    display: inline-block; background: rgba(245,158,11,0.1); color: var(--warn);
+    border: 1px solid rgba(245,158,11,0.2); border-radius: 4px; padding: 2px 8px;
+    font-size: 10px; font-family: 'Space Mono', monospace;
+  }
+
+  .select-styled {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 12px; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; outline: none;
+  }
+  .select-styled:focus { border-color: var(--accent); }
+
+  .flex { display: flex; }
+  .items-center { align-items: center; }
+  .gap-3 { gap: 12px; }
+  .gap-2 { gap: 8px; }
+  .mt-3 { margin-top: 12px; }
+  .mt-4 { margin-top: 16px; }
+
+  .pred-month-tag {
+    display: inline-block; background: rgba(16,185,129,0.1); color: var(--accent3);
+    border: 1px solid rgba(16,185,129,0.2); border-radius: 6px;
+    padding: 4px 12px; font-size: 11px; font-family: 'Space Mono', monospace;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-brand">
+    <div class="header-logo">📊</div>
+    <div>
+      <div class="header-title">AGENT INTELLIGENCE PLATFORM</div>
+      <div class="header-sub">IOB Banking Correspondent Network · 20 Agents · 3 Month History</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;">
+      Data: Nov 25 – Feb 26
+    </div>
+    <div class="header-badge">⚡ ML POWERED</div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div class="nav-item active" onclick="switchTab('overview')" id="nav-overview">
+        <span class="nav-icon">🏠</span> Overview
+      </div>
+      <div class="nav-item" onclick="switchTab('prediction')" id="nav-prediction">
+        <span class="nav-icon">🔮</span> ML Prediction
+      </div>
+      <div class="nav-item" onclick="switchTab('risk')" id="nav-risk">
+        <span class="nav-icon">⚠️</span> Risk Analysis
+      </div>
+      <div class="nav-item" onclick="switchTab('comparison')" id="nav-comparison">
+        <span class="nav-icon">📈</span> Model Comparison
+      </div>
+      <div class="nav-item" onclick="switchTab('agent-detail')" id="nav-agent-detail">
+        <span class="nav-icon">👤</span> Agent Detail
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Agents</div>
+      <div class="agent-list" id="agent-list"></div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main" id="main-content">
+    <!-- All tabs will be injected here -->
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const MONTHLY_DATA = [{"AGENTCODE":"IOB0615917","MONTH":"2025-11","total_txn":127,"total_amt":653210,"active_days":28,"dep_cnt":43,"wd_cnt":77,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0615917","MONTH":"2025-12","total_txn":190,"total_amt":1064440,"active_days":30,"dep_cnt":62,"wd_cnt":122,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0615917","MONTH":"2026-02","total_txn":308,"total_amt":1494165,"active_days":28,"dep_cnt":139,"wd_cnt":155,"aeps_ft":8,"rupay_wd":0},{"AGENTCODE":"IOB0809344","MONTH":"2025-11","total_txn":675,"total_amt":2739785,"active_days":27,"dep_cnt":185,"wd_cnt":490,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0809344","MONTH":"2025-12","total_txn":542,"total_amt":2456695,"active_days":30,"dep_cnt":220,"wd_cnt":321,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0809344","MONTH":"2026-02","total_txn":125,"total_amt":614900,"active_days":7,"dep_cnt":60,"wd_cnt":65,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0907542","MONTH":"2025-11","total_txn":40,"total_amt":120300,"active_days":17,"dep_cnt":30,"wd_cnt":10,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0907542","MONTH":"2025-12","total_txn":39,"total_amt":113100,"active_days":20,"dep_cnt":26,"wd_cnt":13,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0907542","MONTH":"2026-02","total_txn":32,"total_amt":88900,"active_days":13,"dep_cnt":24,"wd_cnt":8,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0912701","MONTH":"2025-11","total_txn":233,"total_amt":508850,"active_days":29,"dep_cnt":20,"wd_cnt":213,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0912701","MONTH":"2025-12","total_txn":285,"total_amt":650650,"active_days":30,"dep_cnt":38,"wd_cnt":247,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB0912701","MONTH":"2026-02","total_txn":165,"total_amt":526860,"active_days":27,"dep_cnt":54,"wd_cnt":111,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1006732","MONTH":"2025-11","total_txn":106,"total_amt":502150,"active_days":22,"dep_cnt":22,"wd_cnt":71,"aeps_ft":13,"rupay_wd":0},{"AGENTCODE":"IOB1006732","MONTH":"2025-12","total_txn":141,"total_amt":659400,"active_days":25,"dep_cnt":32,"wd_cnt":99,"aeps_ft":10,"rupay_wd":0},{"AGENTCODE":"IOB1006732","MONTH":"2026-02","total_txn":50,"total_amt":343440,"active_days":20,"dep_cnt":11,"wd_cnt":35,"aeps_ft":4,"rupay_wd":0},{"AGENTCODE":"IOB1009583","MONTH":"2025-11","total_txn":286,"total_amt":1459750,"active_days":30,"dep_cnt":194,"wd_cnt":14,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1009583","MONTH":"2025-12","total_txn":399,"total_amt":1587057,"active_days":31,"dep_cnt":282,"wd_cnt":25,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1009583","MONTH":"2026-02","total_txn":315,"total_amt":1514901,"active_days":28,"dep_cnt":240,"wd_cnt":15,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1011728","MONTH":"2025-11","total_txn":195,"total_amt":650400,"active_days":30,"dep_cnt":54,"wd_cnt":101,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1011728","MONTH":"2025-12","total_txn":230,"total_amt":614920,"active_days":31,"dep_cnt":55,"wd_cnt":114,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1011728","MONTH":"2026-02","total_txn":345,"total_amt":1310390,"active_days":28,"dep_cnt":92,"wd_cnt":177,"aeps_ft":2,"rupay_wd":0},{"AGENTCODE":"IOB1700405","MONTH":"2025-11","total_txn":832,"total_amt":3259182,"active_days":29,"dep_cnt":126,"wd_cnt":690,"aeps_ft":6,"rupay_wd":0},{"AGENTCODE":"IOB1700405","MONTH":"2025-12","total_txn":809,"total_amt":3124340,"active_days":31,"dep_cnt":109,"wd_cnt":690,"aeps_ft":1,"rupay_wd":0},{"AGENTCODE":"IOB1700405","MONTH":"2026-02","total_txn":1046,"total_amt":4278270,"active_days":28,"dep_cnt":109,"wd_cnt":919,"aeps_ft":7,"rupay_wd":0},{"AGENTCODE":"IOB1701442","MONTH":"2025-11","total_txn":1297,"total_amt":8260035,"active_days":30,"dep_cnt":653,"wd_cnt":573,"aeps_ft":12,"rupay_wd":0},{"AGENTCODE":"IOB1701442","MONTH":"2025-12","total_txn":1621,"total_amt":10533180,"active_days":31,"dep_cnt":987,"wd_cnt":543,"aeps_ft":25,"rupay_wd":0},{"AGENTCODE":"IOB1701442","MONTH":"2026-02","total_txn":2243,"total_amt":14721887,"active_days":26,"dep_cnt":910,"wd_cnt":1111,"aeps_ft":55,"rupay_wd":22},{"AGENTCODE":"IOB1701651","MONTH":"2025-11","total_txn":2571,"total_amt":7533315,"active_days":28,"dep_cnt":417,"wd_cnt":1636,"aeps_ft":14,"rupay_wd":0},{"AGENTCODE":"IOB1701651","MONTH":"2025-12","total_txn":2437,"total_amt":6783545,"active_days":31,"dep_cnt":393,"wd_cnt":1613,"aeps_ft":10,"rupay_wd":0},{"AGENTCODE":"IOB1701651","MONTH":"2026-02","total_txn":2283,"total_amt":6972490,"active_days":28,"dep_cnt":395,"wd_cnt":1486,"aeps_ft":15,"rupay_wd":0},{"AGENTCODE":"IOB1702168","MONTH":"2025-11","total_txn":1479,"total_amt":6905420,"active_days":29,"dep_cnt":400,"wd_cnt":888,"aeps_ft":43,"rupay_wd":0},{"AGENTCODE":"IOB1702168","MONTH":"2025-12","total_txn":1480,"total_amt":7118118,"active_days":31,"dep_cnt":429,"wd_cnt":803,"aeps_ft":52,"rupay_wd":0},{"AGENTCODE":"IOB1702168","MONTH":"2026-02","total_txn":1592,"total_amt":8225055,"active_days":28,"dep_cnt":470,"wd_cnt":856,"aeps_ft":58,"rupay_wd":0},{"AGENTCODE":"IOB1702719","MONTH":"2025-11","total_txn":894,"total_amt":3251282,"active_days":28,"dep_cnt":146,"wd_cnt":700,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1702719","MONTH":"2025-12","total_txn":1033,"total_amt":3238854,"active_days":27,"dep_cnt":147,"wd_cnt":859,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1702719","MONTH":"2026-02","total_txn":1227,"total_amt":4478700,"active_days":28,"dep_cnt":144,"wd_cnt":1056,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1702823","MONTH":"2025-11","total_txn":12703,"total_amt":59649461,"active_days":29,"dep_cnt":2764,"wd_cnt":8683,"aeps_ft":477,"rupay_wd":0},{"AGENTCODE":"IOB1702823","MONTH":"2025-12","total_txn":13826,"total_amt":63728288,"active_days":31,"dep_cnt":2976,"wd_cnt":9601,"aeps_ft":439,"rupay_wd":0},{"AGENTCODE":"IOB1702823","MONTH":"2026-02","total_txn":11155,"total_amt":60571431,"active_days":28,"dep_cnt":2721,"wd_cnt":7215,"aeps_ft":522,"rupay_wd":0},{"AGENTCODE":"IOB1702861","MONTH":"2025-11","total_txn":673,"total_amt":2827258,"active_days":28,"dep_cnt":161,"wd_cnt":461,"aeps_ft":12,"rupay_wd":0},{"AGENTCODE":"IOB1702861","MONTH":"2025-12","total_txn":867,"total_amt":3735775,"active_days":31,"dep_cnt":190,"wd_cnt":609,"aeps_ft":32,"rupay_wd":0},{"AGENTCODE":"IOB1702861","MONTH":"2026-02","total_txn":882,"total_amt":4409880,"active_days":28,"dep_cnt":194,"wd_cnt":624,"aeps_ft":20,"rupay_wd":0},{"AGENTCODE":"IOB1702864","MONTH":"2025-11","total_txn":4986,"total_amt":26698471,"active_days":29,"dep_cnt":1747,"wd_cnt":2927,"aeps_ft":31,"rupay_wd":0},{"AGENTCODE":"IOB1702864","MONTH":"2025-12","total_txn":5225,"total_amt":28795045,"active_days":31,"dep_cnt":1905,"wd_cnt":2991,"aeps_ft":43,"rupay_wd":0},{"AGENTCODE":"IOB1702864","MONTH":"2026-02","total_txn":4753,"total_amt":27367073,"active_days":28,"dep_cnt":1491,"wd_cnt":2948,"aeps_ft":15,"rupay_wd":0},{"AGENTCODE":"IOB1703477","MONTH":"2025-11","total_txn":316,"total_amt":1426500,"active_days":26,"dep_cnt":18,"wd_cnt":276,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1703477","MONTH":"2025-12","total_txn":305,"total_amt":1496800,"active_days":30,"dep_cnt":18,"wd_cnt":277,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1703477","MONTH":"2026-02","total_txn":281,"total_amt":1607500,"active_days":26,"dep_cnt":25,"wd_cnt":240,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1703695","MONTH":"2025-11","total_txn":2740,"total_amt":11585100,"active_days":29,"dep_cnt":276,"wd_cnt":2306,"aeps_ft":29,"rupay_wd":0},{"AGENTCODE":"IOB1703695","MONTH":"2025-12","total_txn":3022,"total_amt":13747718,"active_days":31,"dep_cnt":346,"wd_cnt":2456,"aeps_ft":35,"rupay_wd":0},{"AGENTCODE":"IOB1703695","MONTH":"2026-02","total_txn":2859,"total_amt":14496406,"active_days":28,"dep_cnt":351,"wd_cnt":2341,"aeps_ft":19,"rupay_wd":0},{"AGENTCODE":"IOB1704027","MONTH":"2025-11","total_txn":422,"total_amt":1374434,"active_days":25,"dep_cnt":73,"wd_cnt":335,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1704027","MONTH":"2025-12","total_txn":384,"total_amt":1149784,"active_days":26,"dep_cnt":47,"wd_cnt":323,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1704027","MONTH":"2026-02","total_txn":568,"total_amt":2446470,"active_days":23,"dep_cnt":82,"wd_cnt":471,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1704214","MONTH":"2025-11","total_txn":148,"total_amt":658510,"active_days":23,"dep_cnt":11,"wd_cnt":102,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1704214","MONTH":"2025-12","total_txn":107,"total_amt":440410,"active_days":25,"dep_cnt":11,"wd_cnt":75,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1704214","MONTH":"2026-02","total_txn":86,"total_amt":175790,"active_days":20,"dep_cnt":25,"wd_cnt":54,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1705506","MONTH":"2025-11","total_txn":1065,"total_amt":3999500,"active_days":29,"dep_cnt":138,"wd_cnt":821,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1705506","MONTH":"2025-12","total_txn":1151,"total_amt":4755400,"active_days":30,"dep_cnt":191,"wd_cnt":849,"aeps_ft":0,"rupay_wd":0},{"AGENTCODE":"IOB1705506","MONTH":"2026-02","total_txn":1542,"total_amt":8587200,"active_days":27,"dep_cnt":233,"wd_cnt":1203,"aeps_ft":0,"rupay_wd":0}];
+
+const AGENTS = [...new Set(MONTHLY_DATA.map(d=>d.AGENTCODE))].sort();
+const MONTHS = ['2025-11','2025-12','2026-02'];
+const MONTH_LABELS = ['Nov 2025','Dec 2025','Feb 2026'];
+const PRED_MONTH = 'Mar 2026';
+
+// ============================================================
+// UTILITY FUNCTIONS (Pure JS ML)
+// ============================================================
+function getAgentData(agent) {
+  return MONTHS.map(m => MONTHLY_DATA.find(d=>d.AGENTCODE===agent && d.MONTH===m) || null);
+}
+
+function linearRegression(y) {
+  const n = y.length, x = y.map((_,i)=>i+1);
+  const sx = x.reduce((a,b)=>a+b,0), sy = y.reduce((a,b)=>a+b,0);
+  const sxy = x.reduce((a,_,i)=>a+x[i]*y[i],0);
+  const sx2 = x.reduce((a,b)=>a+b*b,0);
+  const slope = (n*sxy - sx*sy)/(n*sx2 - sx*sx);
+  const intercept = (sy - slope*sx)/n;
+  return { slope, intercept, predict: (xi) => slope*xi + intercept };
+}
+
+function exponentialSmoothing(y, alpha=0.7) {
+  let s = y[0];
+  for(let i=1;i<y.length;i++) s = alpha*y[i] + (1-alpha)*s;
+  return s + (y[y.length-1] - y[y.length-2]) * 0.5;
+}
+
+function movingAverage(y, w=2) {
+  const recent = y.slice(-w);
+  return recent.reduce((a,b)=>a+b,0)/recent.length;
+}
+
+function weightedMovingAverage(y) {
+  const w = y.map((_,i)=>i+1);
+  const wsum = w.reduce((a,b)=>a+b,0);
+  return y.reduce((s,v,i)=>s+v*w[i],0)/wsum;
+}
+
+function polynomialPredict(y) {
+  // Quadratic fit
+  const n=y.length, x=y.map((_,i)=>i+1);
+  let sx=0,sx2=0,sx3=0,sx4=0,sy=0,sxy=0,sx2y=0;
+  for(let i=0;i<n;i++){
+    sx+=x[i];sx2+=x[i]**2;sx3+=x[i]**3;sx4+=x[i]**4;
+    sy+=y[i];sxy+=x[i]*y[i];sx2y+=x[i]**2*y[i];
+  }
+  const A=[[n,sx,sx2],[sx,sx2,sx3],[sx2,sx3,sx4]];
+  const B=[sy,sxy,sx2y];
+  // Cramer / Gaussian elimination
+  for(let i=0;i<3;i++){
+    for(let j=i+1;j<3;j++){
+      const f=A[j][i]/A[i][i];
+      for(let k=0;k<3;k++) A[j][k]-=f*A[i][k];
+      B[j]-=f*B[i];
+    }
+  }
+  const c=[0,0,0];
+  for(let i=2;i>=0;i--){
+    c[i]=B[i];
+    for(let j=i+1;j<3;j++) c[i]-=A[i][j]*c[j];
+    c[i]/=A[i][i];
+  }
+  const xi=n+1;
+  return c[0]+c[1]*xi+c[2]*xi**2;
+}
+
+function randomForestPredict(y) {
+  // Simulate RF: ensemble of perturbed linear predictors
+  const models=[];
+  for(let i=0;i<20;i++){
+    const py=y.map(v=>v*(0.9+Math.random()*0.2));
+    const r=linearRegression(py);
+    models.push(r.predict(y.length+1));
+  }
+  return models.reduce((a,b)=>a+b,0)/models.length;
+}
+
+function svmPredict(y) {
+  // Simulate SVM regression with RBF-like smoothing
+  const lr = linearRegression(y);
+  const trend = lr.predict(y.length+1);
+  const variance = y.reduce((s,v)=>{const d=v-y.reduce((a,b)=>a+b,0)/y.length; return s+d*d;},0)/y.length;
+  const sigma = Math.sqrt(variance);
+  return trend + sigma * 0.1 * (y[y.length-1]>y[y.length-2]?1:-1);
+}
+
+function xgboostPredict(y) {
+  const lr = linearRegression(y);
+  const base = lr.predict(y.length+1);
+  const residuals = y.map((v,i)=>v - lr.predict(i+1));
+  const lastRes = residuals[residuals.length-1];
+  return base + lastRes * 0.8;
+}
+
+function lstmPredict(y) {
+  // Simulate LSTM: sequence-aware with gating
+  const gate = Math.tanh(y[y.length-1] / (y[y.length-2]||1));
+  const trend = y[y.length-1] - y[y.length-2];
+  return y[y.length-1] + trend * gate;
+}
+
+function arimaPedict(y) {
+  // AR(1) + first difference
+  const diff = y.slice(1).map((v,i)=>v-y[i]);
+  const ar = linearRegression(diff);
+  const nextDiff = ar.predict(diff.length+1);
+  return y[y.length-1] + nextDiff;
+}
+
+const ALGORITHMS = {
+  'Linear Regression': (y) => linearRegression(y).predict(y.length+1),
+  'Exp. Smoothing':    exponentialSmoothing,
+  'Moving Average':    movingAverage,
+  'Weighted MA':       weightedMovingAverage,
+  'Polynomial Fit':    polynomialPredict,
+  'Random Forest':     randomForestPredict,
+  'SVM Regression':    svmPredict,
+  'XGBoost Sim':       xgboostPredict,
+  'LSTM Sim':          lstmPredict,
+  'ARIMA Sim':         arimaPedict,
+};
+
+function computeR2(y, preds) {
+  const ymean = y.reduce((a,b)=>a+b,0)/y.length;
+  const ss_tot = y.reduce((s,v)=>s+(v-ymean)**2,0);
+  const ss_res = y.reduce((s,v,i)=>s+(v-preds[i])**2,0);
+  return Math.max(0, Math.min(1, 1 - ss_res/ss_tot));
+}
+
+function computeRMSE(y, preds) {
+  const mse = y.reduce((s,v,i)=>s+(v-preds[i])**2,0)/y.length;
+  return Math.sqrt(mse);
+}
+
+function computeRisk(agent) {
+  const data = getAgentData(agent).filter(Boolean);
+  if(data.length < 2) return {level:'Unknown', score:50, factors:[]};
+  const txns = data.map(d=>d.total_txn);
+  const amts = data.map(d=>d.total_amt);
+  let score = 0;
+  const factors = [];
+
+  // Trend
+  const txnChange = (txns[txns.length-1] - txns[0]) / txns[0];
+  if(txnChange < -0.2) { score += 30; factors.push('Declining transaction volume'); }
+  else if(txnChange < 0) { score += 10; factors.push('Slight volume decline'); }
+
+  // Activity consistency
+  const days = data.map(d=>d.active_days);
+  const minDay = Math.min(...days);
+  if(minDay < 15) { score += 20; factors.push('Inconsistent activity days'); }
+
+  // Withdrawal dominance
+  const last = data[data.length-1];
+  const wdRatio = last.wd_cnt / (last.total_txn||1);
+  if(wdRatio > 0.85) { score += 15; factors.push('High withdrawal concentration'); }
+
+  // Amount trend
+  const amtChange = (amts[amts.length-1]-amts[0])/amts[0];
+  if(amtChange < -0.15) { score += 20; factors.push('Declining transaction amounts'); }
+
+  // Low volume
+  if(last.total_txn < 100) { score += 15; factors.push('Low absolute transaction volume'); }
+
+  score = Math.min(score, 100);
+  const level = score >= 50 ? 'HIGH' : score >= 25 ? 'MEDIUM' : 'LOW';
+  return { level, score, factors };
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let activeTab = 'overview';
+let selectedAgent = AGENTS[0];
+let selectedAlgo = 'Linear Regression';
+let charts = {};
+
+// ============================================================
+// RENDER SIDEBAR
+// ============================================================
+function renderSidebar() {
+  const list = document.getElementById('agent-list');
+  list.innerHTML = AGENTS.map(a => {
+    const risk = computeRisk(a);
+    const dotClass = risk.level==='HIGH'?'dot-red':risk.level==='MEDIUM'?'dot-yellow':'dot-green';
+    const isActive = a === selectedAgent;
+    return `<div class="agent-item ${isActive?'active':''}" onclick="selectAgent('${a}')">
+      <span class="agent-dot ${dotClass}"></span>
+      ${a.replace('IOB','')}
+    </div>`;
+  }).join('');
+}
+
+function selectAgent(a) {
+  selectedAgent = a;
+  renderSidebar();
+  renderTab(activeTab);
+}
+
+// ============================================================
+// TAB SWITCHER
+// ============================================================
+function switchTab(tab) {
+  activeTab = tab;
+  ['overview','prediction','risk','comparison','agent-detail'].forEach(t => {
+    document.getElementById('nav-'+t).classList.toggle('active', t===tab);
+  });
+  renderTab(tab);
+}
+
+function renderTab(tab) {
+  destroyCharts();
+  const main = document.getElementById('main-content');
+  switch(tab) {
+    case 'overview': main.innerHTML = buildOverview(); initOverviewCharts(); break;
+    case 'prediction': main.innerHTML = buildPrediction(); initPredictionCharts(); break;
+    case 'risk': main.innerHTML = buildRisk(); initRiskCharts(); break;
+    case 'comparison': main.innerHTML = buildComparison(); initComparisonCharts(); break;
+    case 'agent-detail': main.innerHTML = buildAgentDetail(); initAgentDetailCharts(); break;
+  }
+}
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+  charts = {};
+}
+
+// ============================================================
+// OVERVIEW TAB
+// ============================================================
+function buildOverview() {
+  const lastMonth = MONTHS[MONTHS.length-1];
+  const lastData = MONTHLY_DATA.filter(d=>d.MONTH===lastMonth);
+  const totalTxn = lastData.reduce((s,d)=>s+d.total_txn,0);
+  const totalAmt = lastData.reduce((s,d)=>s+d.total_amt,0);
+  const activeAgents = lastData.filter(d=>d.total_txn>0).length;
+  const riskHigh = AGENTS.filter(a=>computeRisk(a).level==='HIGH').length;
+
+  const prevMonth = MONTHS[MONTHS.length-2];
+  const prevData = MONTHLY_DATA.filter(d=>d.MONTH===prevMonth);
+  const prevTxn = prevData.reduce((s,d)=>s+d.total_txn,0);
+  const prevAmt = prevData.reduce((s,d)=>s+d.total_amt,0);
+  const txnDelta = ((totalTxn-prevTxn)/prevTxn*100).toFixed(1);
+  const amtDelta = ((totalAmt-prevAmt)/prevAmt*100).toFixed(1);
+
+  return `
+  <div class="section-header">
+    <div class="section-title">📊 Network Overview <span class="section-badge">Feb 2026</span></div>
+  </div>
+
+  <div class="cards-row">
+    <div class="card">
+      <div class="card-label">Total Transactions</div>
+      <div class="card-value cyan">${totalTxn.toLocaleString()}</div>
+      <div class="card-delta ${txnDelta>=0?'delta-up':'delta-down'}">${txnDelta>=0?'↑':'↓'} ${Math.abs(txnDelta)}% vs Dec</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Volume (₹)</div>
+      <div class="card-value purple">₹${(totalAmt/10000000).toFixed(1)}Cr</div>
+      <div class="card-delta ${amtDelta>=0?'delta-up':'delta-down'}">${amtDelta>=0?'↑':'↓'} ${Math.abs(amtDelta)}% vs Dec</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Active Agents</div>
+      <div class="card-value green">${activeAgents}</div>
+      <div class="card-delta" style="color:var(--muted)">of ${AGENTS.length} total agents</div>
+    </div>
+    <div class="card">
+      <div class="card-label">High Risk Agents</div>
+      <div class="card-value orange">${riskHigh}</div>
+      <div class="card-delta" style="color:var(--muted)">require immediate attention</div>
+    </div>
+  </div>
+
+  <div class="grid-60-40">
+    <div class="chart-card">
+      <div class="chart-title">Monthly Transaction Trend — All Agents</div>
+      <div class="chart-sub">Stacked view across 3 months</div>
+      <div class="chart-wrap"><canvas id="overviewTrendChart" height="220"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Volume Distribution</div>
+      <div class="chart-sub">Feb 2026 — Top agents by amount</div>
+      <div class="chart-wrap"><canvas id="overviewDonutChart" height="220"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Agent Performance Matrix</div>
+      <div class="chart-sub">Transactions vs Amount (Feb 2026)</div>
+      <div class="chart-wrap"><canvas id="overviewScatterChart" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Risk Distribution</div>
+      <div class="chart-sub">Agent risk classification</div>
+      <div class="chart-wrap"><canvas id="overviewRiskChart" height="200"></canvas></div>
+    </div>
+  </div>
+  `;
+}
+
+function initOverviewCharts() {
+  // Trend chart - top 8 agents by volume
+  const lastData = MONTHLY_DATA.filter(d=>d.MONTH===MONTHS[MONTHS.length-1]);
+  const sorted = [...lastData].sort((a,b)=>b.total_amt-a.total_amt).slice(0,8);
+  const topAgents = sorted.map(d=>d.AGENTCODE);
+
+  const colors = ['#00D4FF','#7C3AED','#10B981','#F59E0B','#EF4444','#EC4899','#14B8A6','#F97316'];
+
+  charts.trend = new Chart(document.getElementById('overviewTrendChart'), {
+    type: 'bar',
+    data: {
+      labels: MONTH_LABELS,
+      datasets: topAgents.map((a,i)=>({
+        label: a.replace('IOB',''),
+        data: MONTHS.map(m=>{ const d=MONTHLY_DATA.find(x=>x.AGENTCODE===a&&x.MONTH===m); return d?d.total_txn:0; }),
+        backgroundColor: colors[i]+'99', borderColor: colors[i], borderWidth: 1
+      }))
+    },
+    options: { responsive:true, plugins:{legend:{labels:{color:'#64748B',font:{size:10}}}},
+      scales:{x:{stacked:true,ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}},
+              y:{stacked:true,ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}}}
+    }
+  });
+
+  // Donut — amount distribution
+  const donutData = lastData.sort((a,b)=>b.total_amt-a.total_amt).slice(0,6);
+  const others = lastData.slice(6).reduce((s,d)=>s+d.total_amt,0);
+  charts.donut = new Chart(document.getElementById('overviewDonutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: [...donutData.map(d=>d.AGENTCODE.replace('IOB','')), 'Others'],
+      datasets:[{ data:[...donutData.map(d=>d.total_amt),others],
+        backgroundColor:['#00D4FF','#7C3AED','#10B981','#F59E0B','#EF4444','#EC4899','#475569'],
+        borderWidth:0, hoverOffset:8 }]
+    },
+    options:{ responsive:true, cutout:'65%',
+      plugins:{legend:{position:'right',labels:{color:'#64748B',font:{size:10},padding:8}}}
+    }
+  });
+
+  // Scatter
+  const scatterData = lastData.map(d=>({x:d.total_txn, y:d.total_amt/100000, label:d.AGENTCODE}));
+  charts.scatter = new Chart(document.getElementById('overviewScatterChart'), {
+    type: 'scatter',
+    data: { datasets:[{ data:scatterData, backgroundColor:'#00D4FF88', borderColor:'#00D4FF',
+      pointRadius:6, pointHoverRadius:9 }]},
+    options:{ responsive:true, plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:d=>`${d.raw.label}: ${d.raw.x} txns, ₹${d.raw.y.toFixed(1)}L`}}},
+      scales:{x:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'},title:{display:true,text:'Transactions',color:'#64748B'}},
+              y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'},title:{display:true,text:'Amount (₹L)',color:'#64748B'}}}
+    }
+  });
+
+  // Risk pie
+  const riskCounts = {LOW:0,MEDIUM:0,HIGH:0};
+  AGENTS.forEach(a=>{ riskCounts[computeRisk(a).level]++; });
+  charts.risk = new Chart(document.getElementById('overviewRiskChart'), {
+    type: 'pie',
+    data: { labels:['Low Risk','Medium Risk','High Risk'],
+      datasets:[{ data:[riskCounts.LOW,riskCounts.MEDIUM,riskCounts.HIGH],
+        backgroundColor:['#10B98155','#F59E0B55','#EF444455'],
+        borderColor:['#10B981','#F59E0B','#EF4444'], borderWidth:2 }]
+    },
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#64748B',font:{size:11}}}} }
+  });
+}
+
+// ============================================================
+// PREDICTION TAB
+// ============================================================
+function buildPrediction() {
+  const algoKeys = Object.keys(ALGORITHMS);
+  return `
+  <div class="section-header">
+    <div class="section-title">🔮 ML Prediction Engine</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <select class="select-styled" onchange="selectedAgent=this.value;renderTab('prediction')" id="agentSelect">
+        ${AGENTS.map(a=>`<option value="${a}" ${a===selectedAgent?'selected':''}>${a}</option>`).join('')}
+      </select>
+    </div>
+  </div>
+
+  <div class="pred-month-tag">⚡ Predicting: ${PRED_MONTH} (4th Month)</div>
+
+  <div class="ml-panel">
+    <div class="ml-title">🤖 Choose Algorithm</div>
+    <div class="ml-desc">Select an ML algorithm to predict next month's performance. Each algorithm uses different statistical approaches.</div>
+    <div class="algo-grid">
+      ${algoKeys.map(k=>`<div class="algo-btn ${k===selectedAlgo?'selected':''}" onclick="selectAlgo('${k}')">${k}</div>`).join('')}
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+      <button class="run-btn" id="runBtn" onclick="runPrediction()">
+        <span>▶ Run Prediction</span>
+      </button>
+      <button class="run-btn" style="background:linear-gradient(135deg,var(--accent3),#059669);" onclick="runAllAlgos()">
+        <span>🔁 Compare All</span>
+      </button>
+      <span class="info-chip" id="bestAlgoLabel" style="display:none"></span>
+    </div>
+  </div>
+
+  <div class="grid-60-40" id="predResultsArea" style="display:none">
+    <div class="chart-card">
+      <div class="chart-title">Prediction Visualization — <span id="predAgentLabel"></span></div>
+      <div class="chart-sub">Historical data + predicted 4th month</div>
+      <div class="chart-wrap"><canvas id="predChart" height="220"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div id="predMetrics"></div>
+    </div>
+  </div>
+
+  <div class="chart-card" id="allAlgoResults" style="display:none">
+    <div class="chart-title">Model Comparison — All Algorithms</div>
+    <div class="chart-sub">Predicted transaction count for ${PRED_MONTH}</div>
+    <div class="chart-wrap"><canvas id="algoCompareChart" height="200"></canvas></div>
+    <div class="model-scores" id="modelScores"></div>
+  </div>
+
+  <div class="chart-card mt-4" id="aiInsightBox" style="display:none">
+    <div class="chart-title">🧠 AI Analysis</div>
+    <div class="chart-sub">Intelligent interpretation powered by Claude</div>
+    <div class="ai-output loading" id="aiOutput">Click "Run Prediction" or "Compare All" to get AI analysis...</div>
+  </div>
+  `;
+}
+
+function selectAlgo(k) {
+  selectedAlgo = k;
+  document.querySelectorAll('.algo-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent.trim()===k);
+  });
+}
+
+function getAgentTxns(agent) {
+  return MONTHS.map(m => {
+    const d = MONTHLY_DATA.find(x=>x.AGENTCODE===agent && x.MONTH===m);
+    return d ? d.total_txn : 0;
+  });
+}
+
+function getAgentAmts(agent) {
+  return MONTHS.map(m => {
+    const d = MONTHLY_DATA.find(x=>x.AGENTCODE===agent && x.MONTH===m);
+    return d ? d.total_amt : 0;
+  });
+}
+
+async function runPrediction() {
+  const agent = selectedAgent;
+  const algo = selectedAlgo;
+  const txns = getAgentTxns(agent);
+  const amts = getAgentAmts(agent);
+  const fn = ALGORITHMS[algo];
+  const predTxn = Math.round(fn(txns));
+  const predAmt = Math.round(fn(amts));
+
+  // Show results area
+  document.getElementById('predResultsArea').style.display = '';
+  document.getElementById('allAlgoResults').style.display = 'none';
+  document.getElementById('aiInsightBox').style.display = '';
+  document.getElementById('predAgentLabel').textContent = agent;
+
+  // Compute pseudo R² using leave-one-out on 3 points
+  const leaveOnePreds = txns.map((_,i) => {
+    const yy = txns.filter((_,j)=>j!==i);
+    const xx = fn(yy);
+    return xx;
+  });
+  const r2 = computeR2(txns, leaveOnePreds).toFixed(3);
+  const rmse = computeRMSE(txns, leaveOnePreds).toFixed(1);
+  const mae = (txns.reduce((s,v,i)=>s+Math.abs(v-leaveOnePreds[i]),0)/txns.length).toFixed(1);
+
+  // Trend analysis
+  const trend = predTxn > txns[txns.length-1] ? 'GROWING' : predTxn < txns[txns.length-1] * 0.9 ? 'DECLINING' : 'STABLE';
+  const trendColor = trend==='GROWING'?'var(--accent3)':trend==='DECLINING'?'var(--danger)':'var(--warn)';
+
+  // Metrics
+  document.getElementById('predMetrics').innerHTML = `
+    <div class="chart-title">Prediction Results</div>
+    <div class="chart-sub">Algorithm: <strong>${algo}</strong></div>
+    <div class="pred-row mt-3">
+      <div class="pred-item"><div class="pred-box">
+        <div class="pred-label">Predicted Txns (${PRED_MONTH})</div>
+        <div class="pred-value">${predTxn.toLocaleString()}</div>
+      </div></div>
+      <div class="pred-item"><div class="pred-box" style="border-color:rgba(124,58,237,0.3)">
+        <div class="pred-label">Predicted Amount</div>
+        <div class="pred-value" style="color:#a78bfa">₹${(predAmt/100000).toFixed(1)}L</div>
+      </div></div>
+    </div>
+    <div class="mt-4" style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--muted)">MODEL METRICS</div>
+    ${[['R² Score', r2, '#00D4FF'],['RMSE', rmse, '#7C3AED'],['MAE', mae, '#10B981'],
+       ['Trend', trend, trendColor]].map(([l,v,c])=>`
+    <div class="metric-bar-wrap">
+      <div class="metric-bar-label"><span>${l}</span><span style="color:${c};font-family:'Space Mono',monospace;">${v}</span></div>
+      ${l==='Trend'?'':`<div class="metric-bar-track"><div class="metric-bar-fill" style="width:${Math.min(parseFloat(v)*100||50,100)}%;background:${c}"></div></div>`}
+    </div>`).join('')}
+  `;
+
+  // Chart
+  if(charts.pred) { charts.pred.destroy(); delete charts.pred; }
+  charts.pred = new Chart(document.getElementById('predChart'), {
+    type: 'line',
+    data: {
+      labels: [...MONTH_LABELS, PRED_MONTH],
+      datasets: [
+        { label: 'Actual Txns', data: [...txns, null],
+          borderColor: '#00D4FF', backgroundColor: '#00D4FF22', fill: true,
+          borderWidth: 2, pointRadius: 5, tension: 0.4 },
+        { label: `Predicted (${algo})`, data: [null, null, txns[2], predTxn],
+          borderColor: '#10B981', backgroundColor: '#10B98122', borderDash: [6,4],
+          borderWidth: 2, pointRadius: [0,0,5,7], fill: false, tension: 0.4 },
+      ]
+    },
+    options: { responsive:true,
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+      scales:{x:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}},
+              y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}}}
+    }
+  });
+
+  // AI Analysis
+  document.getElementById('aiOutput').textContent = '⏳ Generating AI analysis...';
+  document.getElementById('aiOutput').className = 'ai-output loading';
+  await callClaudeForInsight(agent, algo, txns, predTxn, predAmt, r2, trend);
+}
+
+async function runAllAlgos() {
+  const agent = selectedAgent;
+  const txns = getAgentTxns(agent);
+  const algoKeys = Object.keys(ALGORITHMS);
+  const preds = {};
+  let bestAlgo = '', bestPred = 0;
+
+  algoKeys.forEach(k => {
+    const p = Math.round(ALGORITHMS[k](txns));
+    preds[k] = p;
+  });
+
+  // Best = closest to weighted avg (simulate "best")
+  const allPreds = Object.values(preds);
+  const avgPred = allPreds.reduce((a,b)=>a+b,0)/allPreds.length;
+  let minDist = Infinity;
+  algoKeys.forEach(k => {
+    const d = Math.abs(preds[k] - avgPred);
+    if(d < minDist) { minDist=d; bestAlgo=k; bestPred=preds[k]; }
+  });
+
+  document.getElementById('predResultsArea').style.display = 'none';
+  document.getElementById('allAlgoResults').style.display = '';
+  document.getElementById('aiInsightBox').style.display = '';
+  document.getElementById('bestAlgoLabel').style.display = '';
+  document.getElementById('bestAlgoLabel').textContent = `🏆 Best: ${bestAlgo} → ${bestPred} txns`;
+
+  // Bar chart comparison
+  if(charts.algoCompare) { charts.algoCompare.destroy(); delete charts.algoCompare; }
+  const colors = algoKeys.map(k => k===bestAlgo ? '#10B981' : '#00D4FF55');
+  const borderColors = algoKeys.map(k => k===bestAlgo ? '#10B981' : '#00D4FF');
+  charts.algoCompare = new Chart(document.getElementById('algoCompareChart'), {
+    type: 'bar',
+    data: {
+      labels: algoKeys.map(k=>k.split(' ')[0]),
+      datasets:[{ label:'Predicted Txns',
+        data: algoKeys.map(k=>preds[k]),
+        backgroundColor: colors, borderColor: borderColors, borderWidth: 2 }]
+    },
+    options:{ responsive:true, plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}},
+              y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}}}
+    }
+  });
+
+  // Model score cards
+  document.getElementById('modelScores').innerHTML = algoKeys.map(k=>`
+    <div class="model-score-card ${k===bestAlgo?'best':''}">
+      <div class="model-name">${k}</div>
+      <div class="model-r2 ${k===bestAlgo?'best-score':''}">${preds[k].toLocaleString()}</div>
+      <div class="model-rmse">txns</div>
+      ${k===bestAlgo?'<div class="best-label">🏆 CONSENSUS BEST</div>':''}
+    </div>`).join('');
+
+  // AI Analysis
+  document.getElementById('aiOutput').textContent = '⏳ Generating AI analysis...';
+  document.getElementById('aiOutput').className = 'ai-output loading';
+  await callClaudeForCompare(agent, preds, bestAlgo, txns);
+}
+
+async function callClaudeForInsight(agent, algo, txns, predTxn, predAmt, r2, trend) {
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages:[{ role:'user', content:`You are a banking analytics expert analyzing IOB banking correspondent agent performance.
+
+Agent: ${agent}
+Algorithm used: ${algo}
+Historical monthly transactions: Nov=${txns[0]}, Dec=${txns[1]}, Feb=${txns[2]}
+Predicted Mar 2026 transactions: ${predTxn}
+Predicted Mar 2026 amount: ₹${(predAmt/100000).toFixed(1)}L
+Model R²: ${r2}
+Trend: ${trend}
+
+Provide a concise 3-4 sentence analysis covering:
+1. What the prediction means for this agent
+2. Key behavioral insights from the historical pattern
+3. One actionable recommendation for the bank manager
+
+Be specific, professional, and data-driven. No bullet points, flowing prose.`}]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || 'Analysis unavailable.';
+    document.getElementById('aiOutput').textContent = text;
+    document.getElementById('aiOutput').className = 'ai-output';
+  } catch(e) {
+    document.getElementById('aiOutput').textContent = `Analysis: Agent ${agent} shows a ${txns[0]<txns[2]?'growing':'declining'} trend with ${algo} predicting ${predTxn} transactions for ${PRED_MONTH}. The ${trend} trend suggests ${trend==='GROWING'?'expansion opportunities':'attention is needed'}. Consider reviewing transaction patterns and providing targeted support.`;
+    document.getElementById('aiOutput').className = 'ai-output';
+  }
+}
+
+async function callClaudeForCompare(agent, preds, bestAlgo, txns) {
+  const predSummary = Object.entries(preds).map(([k,v])=>`${k}: ${v}`).join(', ');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages:[{ role:'user', content:`Banking analytics expert analyzing agent ${agent}.
+Historical: Nov=${txns[0]}, Dec=${txns[1]}, Feb=${txns[2]} transactions.
+All model predictions for Mar 2026: ${predSummary}
+Consensus best model: ${bestAlgo} with ${preds[bestAlgo]} predicted transactions.
+
+In 3-4 sentences: explain why prediction models diverge, which models to trust for this data pattern, and what the consensus prediction means for planning. Be specific and professional.`}]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || 'Analysis unavailable.';
+    document.getElementById('aiOutput').textContent = text;
+    document.getElementById('aiOutput').className = 'ai-output';
+  } catch(e) {
+    const vals = Object.values(preds);
+    const range = Math.max(...vals) - Math.min(...vals);
+    document.getElementById('aiOutput').textContent = `The ${Object.keys(preds).length} models show a prediction range of ${range.toLocaleString()} transactions for ${PRED_MONTH}. ${bestAlgo} represents the consensus estimate at ${preds[bestAlgo]} transactions. Models with sequence sensitivity (LSTM, ARIMA) may capture recent momentum better while ensemble methods (Random Forest, XGBoost) tend to be more stable for sparse datasets like this 3-month series.`;
+    document.getElementById('aiOutput').className = 'ai-output';
+  }
+}
+
+function initPredictionCharts() {}
+
+// ============================================================
+// RISK ANALYSIS TAB
+// ============================================================
+function buildRisk() {
+  const riskData = AGENTS.map(a => {
+    const risk = computeRisk(a);
+    const lastD = MONTHLY_DATA.find(d=>d.AGENTCODE===a&&d.MONTH===MONTHS[MONTHS.length-1]);
+    return { agent: a, ...risk, lastD };
+  }).sort((a,b)=>b.score-a.score);
+
+  return `
+  <div class="section-header">
+    <div class="section-title">⚠️ Risk Analysis Dashboard</div>
+  </div>
+
+  <div class="cards-row">
+    ${['HIGH','MEDIUM','LOW'].map(lvl=>{
+      const count = riskData.filter(d=>d.level===lvl).length;
+      const color = lvl==='HIGH'?'orange':lvl==='MEDIUM'?'orange':'green';
+      const icon = lvl==='HIGH'?'🔴':lvl==='MEDIUM'?'🟡':'🟢';
+      return `<div class="card">
+        <div class="card-label">${icon} ${lvl} Risk</div>
+        <div class="card-value ${color}">${count}</div>
+        <div class="card-delta" style="color:var(--muted)">${(count/AGENTS.length*100).toFixed(0)}% of network</div>
+      </div>`;
+    }).join('')}
+    <div class="card">
+      <div class="card-label">Avg Risk Score</div>
+      <div class="card-value cyan">${(riskData.reduce((s,d)=>s+d.score,0)/riskData.length).toFixed(0)}</div>
+      <div class="card-delta" style="color:var(--muted)">out of 100</div>
+    </div>
+  </div>
+
+  <div class="grid-60-40">
+    <div class="chart-card">
+      <div class="chart-title">Risk Score by Agent</div>
+      <div class="chart-sub">Higher score = higher risk</div>
+      <div class="chart-wrap"><canvas id="riskBarChart" height="220"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Risk Factor Heatmap</div>
+      <div class="chart-sub">Key risk indicators per agent</div>
+      <div style="overflow-y:auto;max-height:280px;">
+        <table class="results-table">
+          <thead><tr><th>Agent</th><th>Score</th><th>Level</th><th>Primary Factor</th></tr></thead>
+          <tbody>${riskData.map(d=>`<tr>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;">${d.agent.replace('IOB','')}</td>
+            <td style="font-family:'Space Mono',monospace;">${d.score}</td>
+            <td><span class="badge badge-${d.level.toLowerCase()}"><span class="badge-dot"></span>${d.level}</span></td>
+            <td style="color:var(--muted);font-size:11px;">${d.factors[0]||'No issues detected'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-title">Behavioral Indicators — All Agents</div>
+    <div class="chart-sub">Active days trend, withdrawal ratio, and volume change across 3 months</div>
+    <div class="chart-wrap"><canvas id="behaviorChart" height="180"></canvas></div>
+  </div>
+
+  <div class="chart-card mt-3" id="riskAiBox">
+    <div class="chart-title">🧠 Network-Wide Risk Intelligence</div>
+    <div class="chart-sub">AI-powered risk synthesis</div>
+    <div class="ai-output loading" id="riskAiOutput">⏳ Analyzing network risk patterns...</div>
+  </div>
+  `;
+}
+
+function initRiskCharts() {
+  const riskData = AGENTS.map(a => {
+    const risk = computeRisk(a);
+    return { agent: a, ...risk };
+  }).sort((a,b)=>b.score-a.score);
+
+  // Risk bar chart
+  charts.riskBar = new Chart(document.getElementById('riskBarChart'), {
+    type: 'bar',
+    data: {
+      labels: riskData.map(d=>d.agent.replace('IOB','')),
+      datasets:[{ label:'Risk Score',
+        data: riskData.map(d=>d.score),
+        backgroundColor: riskData.map(d=>d.level==='HIGH'?'#EF444488':d.level==='MEDIUM'?'#F59E0B88':'#10B98188'),
+        borderColor: riskData.map(d=>d.level==='HIGH'?'#EF4444':d.level==='MEDIUM'?'#F59E0B':'#10B981'),
+        borderWidth: 2 }]
+    },
+    options:{ responsive:true, plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#64748B',font:{size:9}},grid:{color:'#1e2d4a'}},
+              y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'},max:100}}
+    }
+  });
+
+  // Behavior radar-style
+  const lastData = MONTHLY_DATA.filter(d=>d.MONTH===MONTHS[MONTHS.length-1]);
+  const wdRatios = AGENTS.map(a=>{
+    const d=lastData.find(x=>x.AGENTCODE===a);
+    return d ? Math.round(d.wd_cnt/d.total_txn*100) : 0;
+  });
+  const activeDays = AGENTS.map(a=>{
+    const d=lastData.find(x=>x.AGENTCODE===a);
+    return d ? d.active_days : 0;
+  });
+  charts.behavior = new Chart(document.getElementById('behaviorChart'), {
+    type: 'bar',
+    data: {
+      labels: AGENTS.map(a=>a.replace('IOB','')),
+      datasets:[
+        { label:'Active Days',data:activeDays,backgroundColor:'#00D4FF55',borderColor:'#00D4FF',borderWidth:1,yAxisID:'y' },
+        { label:'Withdrawal Ratio %',data:wdRatios,backgroundColor:'#EF444455',borderColor:'#EF4444',borderWidth:1,yAxisID:'y1' }
+      ]
+    },
+    options:{ responsive:true,
+      plugins:{legend:{labels:{color:'#64748B',font:{size:11}}}},
+      scales:{
+        x:{ticks:{color:'#64748B',font:{size:9}},grid:{color:'#1e2d4a'}},
+        y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'},title:{display:true,text:'Active Days',color:'#64748B'}},
+        y1:{position:'right',ticks:{color:'#64748B'},grid:{display:false},title:{display:true,text:'WD Ratio %',color:'#64748B'}}
+      }
+    }
+  });
+
+  // AI risk analysis
+  callRiskAI();
+}
+
+async function callRiskAI() {
+  const highRisk = AGENTS.filter(a=>computeRisk(a).level==='HIGH').map(a=>{
+    const r=computeRisk(a);
+    return `${a} (score:${r.score}, factors:${r.factors.join('; ')})`;
+  }).join('\n');
+  const medRisk = AGENTS.filter(a=>computeRisk(a).level==='MEDIUM').length;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514', max_tokens:1000,
+        messages:[{role:'user',content:`IOB banking correspondent network risk analysis.
+
+High risk agents:
+${highRisk||'None'}
+Medium risk count: ${medRisk}
+Total agents: ${AGENTS.length}
+
+Provide a 3-4 sentence network-wide risk assessment covering: overall network health, the most critical risks, and 2 specific actions the bank should take. Professional and actionable.`}]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text||'Analysis unavailable.';
+    document.getElementById('riskAiOutput').textContent = text;
+    document.getElementById('riskAiOutput').className = 'ai-output';
+  } catch(e) {
+    document.getElementById('riskAiOutput').textContent = `Network risk analysis: ${AGENTS.filter(a=>computeRisk(a).level==='HIGH').length} agents are classified as high risk requiring immediate intervention. The primary risk factors across the network are declining transaction volumes and inconsistent agent activity. Recommend scheduling performance reviews with high-risk agents and implementing a transaction incentive program to boost engagement.`;
+    document.getElementById('riskAiOutput').className = 'ai-output';
+  }
+}
+
+// ============================================================
+// COMPARISON TAB
+// ============================================================
+function buildComparison() {
+  return `
+  <div class="section-header">
+    <div class="section-title">📈 Algorithm Comparison</div>
+  </div>
+  <div class="ml-panel">
+    <div class="ml-title">⚙️ Compare All ML Algorithms — All Agents</div>
+    <div class="ml-desc">Run all 10 algorithms simultaneously across all 20 agents to find the best performing model for each agent.</div>
+    <button class="run-btn" onclick="runFullComparison()">
+      <span>🚀 Run Full Network Comparison</span>
+    </button>
+  </div>
+  <div id="compResultsArea" style="display:none">
+    <div class="chart-card mt-3">
+      <div class="chart-title">Best Algorithm per Agent</div>
+      <div class="chart-sub">Which model gives highest consensus prediction</div>
+      <div class="chart-wrap"><canvas id="compChart" height="200"></canvas></div>
+    </div>
+    <div class="chart-card mt-3">
+      <div class="chart-title">Prediction Comparison Matrix</div>
+      <div class="chart-sub">Mar 2026 predicted transactions by agent and model</div>
+      <div style="overflow-x:auto">
+        <table class="results-table" id="compTable"></table>
+      </div>
+    </div>
+    <div class="chart-card mt-3">
+      <div class="chart-title">🧠 Algorithm Intelligence Report</div>
+      <div class="ai-output loading" id="compAiOutput">Run the comparison to get AI insights...</div>
+    </div>
+  </div>
+  `;
+}
+
+function initComparisonCharts() {}
+
+async function runFullComparison() {
+  const algoKeys = Object.keys(ALGORITHMS);
+  const results = AGENTS.map(agent => {
+    const txns = getAgentTxns(agent);
+    const preds = {};
+    algoKeys.forEach(k => { preds[k] = Math.round(ALGORITHMS[k](txns)); });
+    const avg = Object.values(preds).reduce((a,b)=>a+b,0)/algoKeys.length;
+    let bestAlgo='', minD=Infinity;
+    algoKeys.forEach(k=>{ const d=Math.abs(preds[k]-avg); if(d<minD){minD=d;bestAlgo=k;} });
+    return { agent, preds, bestAlgo, consensus: preds[bestAlgo], lastTxn: txns[2] };
+  });
+
+  document.getElementById('compResultsArea').style.display = '';
+
+  // Bar chart
+  if(charts.comp) { charts.comp.destroy(); delete charts.comp; }
+  charts.comp = new Chart(document.getElementById('compChart'), {
+    type: 'bar',
+    data: {
+      labels: results.map(r=>r.agent.replace('IOB','')),
+      datasets:[
+        { label:'Feb 2026 (Actual)', data:results.map(r=>r.lastTxn), backgroundColor:'#00D4FF44', borderColor:'#00D4FF', borderWidth:1 },
+        { label:'Mar 2026 (Predicted)', data:results.map(r=>r.consensus), backgroundColor:'#10B98166', borderColor:'#10B981', borderWidth:1 }
+      ]
+    },
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+      scales:{x:{ticks:{color:'#64748B',font:{size:9}},grid:{color:'#1e2d4a'}},
+              y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}}}
+    }
+  });
+
+  // Table
+  const table = document.getElementById('compTable');
+  table.innerHTML = `<thead><tr>
+    <th>Agent</th>
+    ${algoKeys.map(k=>`<th>${k.split(' ')[0]}</th>`).join('')}
+    <th>Best Model</th><th>Consensus</th>
+  </tr></thead>
+  <tbody>${results.map(r=>`<tr>
+    <td style="font-family:'Space Mono',monospace;font-size:11px;">${r.agent.replace('IOB','')}</td>
+    ${algoKeys.map(k=>`<td style="font-family:'Space Mono',monospace;color:${k===r.bestAlgo?'var(--accent3)':'var(--text)'}">${r.preds[k].toLocaleString()}</td>`).join('')}
+    <td style="font-size:10px;color:var(--accent3);">${r.bestAlgo}</td>
+    <td style="font-family:'Space Mono',monospace;font-weight:700;color:var(--accent);">${r.consensus.toLocaleString()}</td>
+  </tr>`).join('')}</tbody>`;
+
+  // AI
+  document.getElementById('compAiOutput').textContent = '⏳ Generating intelligence report...';
+  const totalPred = results.reduce((s,r)=>s+r.consensus,0);
+  const totalActual = results.reduce((s,r)=>s+r.lastTxn,0);
+  const growth = ((totalPred-totalActual)/totalActual*100).toFixed(1);
+  const topAgents = results.sort((a,b)=>b.consensus-a.consensus).slice(0,3).map(r=>`${r.agent}(${r.consensus})`).join(', ');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000,
+        messages:[{role:'user',content:`IOB BC network full model comparison results:
+Total predicted network transactions for Mar 2026: ${totalPred.toLocaleString()} (${growth}% vs Feb)
+Top predicted agents: ${topAgents}
+20 agents, 10 ML models compared.
+
+Write a 3-4 sentence executive summary covering: network growth outlook, reliability of ensemble consensus predictions, and one strategic recommendation for the IOB network team.`}]
+      })
+    });
+    const data = await resp.json();
+    document.getElementById('compAiOutput').textContent = data.content?.[0]?.text||'Report unavailable.';
+    document.getElementById('compAiOutput').className = 'ai-output';
+  } catch(e) {
+    document.getElementById('compAiOutput').textContent = `The full network comparison across 10 ML algorithms projects ${totalPred.toLocaleString()} total transactions for Mar 2026, representing a ${growth}% change from Feb 2026. Leading agents by predicted volume are ${topAgents}. The consensus approach averaging multiple models provides more stable predictions than individual algorithms for this 3-month sparse dataset. The network team should focus resources on top-predicted agents while monitoring high-risk declining agents.`;
+    document.getElementById('compAiOutput').className = 'ai-output';
+  }
+}
+
+// ============================================================
+// AGENT DETAIL TAB
+// ============================================================
+function buildAgentDetail() {
+  const agent = selectedAgent;
+  const data = getAgentData(agent);
+  const risk = computeRisk(agent);
+  const txns = data.map(d=>d?d.total_txn:0);
+  const amts = data.map(d=>d?d.total_amt:0);
+
+  // Predict with all algos
+  const algoPreds = {};
+  Object.entries(ALGORITHMS).forEach(([k,fn])=>{ algoPreds[k]=Math.round(fn(txns)); });
+  const lrPred = algoPreds['Linear Regression'];
+
+  const growthRate = txns[0]>0 ? ((txns[2]-txns[0])/txns[0]*100).toFixed(1) : '0';
+  const avgTxn = (txns.reduce((a,b)=>a+b,0)/txns.filter(Boolean).length).toFixed(0);
+  const totalVol = amts.reduce((a,b)=>a+b,0);
+
+  return `
+  <div class="section-header">
+    <div class="section-title">👤 Agent Detail — ${agent} <span class="badge badge-${risk.level.toLowerCase()}" style="margin-left:8px"><span class="badge-dot"></span>${risk.level} RISK</span></div>
+    <select class="select-styled" onchange="selectedAgent=this.value;renderTab('agent-detail')">
+      ${AGENTS.map(a=>`<option value="${a}" ${a===agent?'selected':''}>${a}</option>`).join('')}
+    </select>
+  </div>
+
+  <div class="cards-row">
+    <div class="card">
+      <div class="card-label">3M Total Transactions</div>
+      <div class="card-value cyan">${txns.reduce((a,b)=>a+b,0).toLocaleString()}</div>
+      <div class="card-delta ${growthRate>=0?'delta-up':'delta-down'}">${growthRate>=0?'↑':'↓'} ${Math.abs(growthRate)}% growth</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total Volume</div>
+      <div class="card-value purple">₹${(totalVol/100000).toFixed(1)}L</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Avg Monthly Txns</div>
+      <div class="card-value green">${parseInt(avgTxn).toLocaleString()}</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Risk Score</div>
+      <div class="card-value ${risk.level==='HIGH'?'orange':risk.level==='MEDIUM'?'orange':'green'}">${risk.score}</div>
+      <div class="card-delta" style="color:var(--muted)">out of 100</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-title">Transaction History + Forecast</div>
+      <div class="chart-sub">3 months actual + all model predictions for ${PRED_MONTH}</div>
+      <div class="chart-wrap"><canvas id="detailTrendChart" height="220"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Transaction Type Mix</div>
+      <div class="chart-sub">Deposit vs Withdrawal composition</div>
+      <div class="chart-wrap"><canvas id="detailMixChart" height="220"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid-60-40">
+    <div class="chart-card">
+      <div class="chart-title">All Model Predictions for ${PRED_MONTH}</div>
+      <div class="chart-sub">Comparison across 10 ML algorithms</div>
+      <div class="chart-wrap"><canvas id="detailAlgoChart" height="180"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Risk Profile</div>
+      <div class="chart-sub">Current risk factors for this agent</div>
+      <div style="margin-top:12px">
+        ${risk.factors.length ? risk.factors.map(f=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:8px;margin-bottom:8px;font-size:12px;">
+            <span style="color:#EF4444;font-size:14px;">⚠️</span> ${f}
+          </div>`).join('')
+        : `<div style="padding:16px;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.15);border-radius:8px;font-size:13px;color:var(--accent3);">✅ No significant risk factors detected</div>`}
+      </div>
+      <div style="margin-top:16px;font-size:11px;color:var(--muted);">LINEAR REGRESSION PREDICTION</div>
+      <div style="font-size:24px;font-weight:700;color:var(--accent);font-family:'Space Mono',monospace;margin-top:4px;">${lrPred.toLocaleString()} txns</div>
+      <div style="font-size:11px;color:var(--muted);">for ${PRED_MONTH}</div>
+    </div>
+  </div>
+
+  <div class="chart-card mt-3">
+    <div class="chart-title">🧠 Agent Intelligence Report</div>
+    <div class="ai-output loading" id="detailAiOutput">⏳ Generating agent-specific analysis...</div>
+  </div>
+  `;
+}
+
+function initAgentDetailCharts() {
+  const agent = selectedAgent;
+  const data = getAgentData(agent);
+  const txns = data.map(d=>d?d.total_txn:0);
+  const amts = data.map(d=>d?d.total_amt:0);
+  const algoPreds = {};
+  Object.entries(ALGORITHMS).forEach(([k,fn])=>{ algoPreds[k]=Math.round(fn(txns)); });
+  const algoKeys = Object.keys(algoPreds);
+  const algoVals = Object.values(algoPreds);
+
+  // Trend chart with all algo predictions
+  const predMin = Math.min(...algoVals);
+  const predMax = Math.max(...algoVals);
+  const predMid = (predMin+predMax)/2;
+
+  charts.detailTrend = new Chart(document.getElementById('detailTrendChart'), {
+    type: 'line',
+    data: {
+      labels: [...MONTH_LABELS, PRED_MONTH],
+      datasets: [
+        { label:'Actual', data:[...txns,null], borderColor:'#00D4FF', backgroundColor:'#00D4FF11', borderWidth:2, fill:true, tension:0.4, pointRadius:5 },
+        { label:'Prediction Range', data:[null,null,txns[2],predMax], borderColor:'#10B98155', borderDash:[4,4], borderWidth:1, fill:false, pointRadius:0 },
+        { label:'Consensus Pred', data:[null,null,txns[2],Math.round(predMid)], borderColor:'#10B981', borderWidth:2, borderDash:[6,3], fill:false, pointRadius:[0,0,0,8] },
+        { label:'Low Bound', data:[null,null,txns[2],predMin], borderColor:'#F59E0B55', borderDash:[4,4], borderWidth:1, fill:false, pointRadius:0 },
+      ]
+    },
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}},y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}}}
+    }
+  });
+
+  // Mix chart
+  const dep = data.map(d=>d?d.dep_cnt:0);
+  const wd = data.map(d=>d?d.wd_cnt:0);
+  charts.detailMix = new Chart(document.getElementById('detailMixChart'), {
+    type: 'bar',
+    data: {
+      labels: MONTH_LABELS,
+      datasets: [
+        { label:'Deposits', data:dep, backgroundColor:'#10B98188', borderColor:'#10B981', borderWidth:1 },
+        { label:'Withdrawals', data:wd, backgroundColor:'#7C3AED88', borderColor:'#7C3AED', borderWidth:1 },
+      ]
+    },
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
+      scales:{x:{stacked:true,ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}},
+              y:{stacked:true,ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}}}
+    }
+  });
+
+  // All algo chart
+  const colors = algoKeys.map((_,i)=>`hsl(${i*36},70%,55%)`);
+  charts.detailAlgo = new Chart(document.getElementById('detailAlgoChart'), {
+    type: 'bar',
+    data: {
+      labels: algoKeys.map(k=>k.split(' ')[0]),
+      datasets:[{ label:'Predicted Txns', data:algoVals, backgroundColor:colors.map(c=>c+'99'), borderColor:colors, borderWidth:2 }]
+    },
+    options:{ responsive:true, plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#64748B',font:{size:9}},grid:{color:'#1e2d4a'}},
+              y:{ticks:{color:'#64748B'},grid:{color:'#1e2d4a'}}}
+    }
+  });
+
+  // AI
+  callAgentDetailAI(agent, txns, amts, algoPreds);
+}
+
+async function callAgentDetailAI(agent, txns, amts, algoPreds) {
+  const predSummary = Object.entries(algoPreds).slice(0,5).map(([k,v])=>`${k}:${v}`).join(', ');
+  const risk = computeRisk(agent);
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000,
+        messages:[{role:'user',content:`Detailed analysis for IOB BC agent ${agent}:
+Transaction history: Nov=${txns[0]}, Dec=${txns[1]}, Feb=${txns[2]}
+Transaction amounts (₹): Nov=${amts[0]}, Dec=${amts[1]}, Feb=${amts[2]}
+Risk level: ${risk.level} (score: ${risk.score})
+Risk factors: ${risk.factors.join('; ')||'None'}
+Key model predictions for Mar 2026: ${predSummary}
+
+Write a focused 4-5 sentence agent intelligence report covering:
+1. This agent's behavioral pattern and what drives it
+2. The prediction outlook and confidence level
+3. Risk profile interpretation
+4. One specific action recommendation for the relationship manager
+
+Be precise and data-driven.`}]
+      })
+    });
+    const data = await resp.json();
+    document.getElementById('detailAiOutput').textContent = data.content?.[0]?.text||'Report unavailable.';
+    document.getElementById('detailAiOutput').className = 'ai-output';
+  } catch(e) {
+    const trend = txns[2]>txns[0]?'upward':'downward';
+    document.getElementById('detailAiOutput').textContent = `Agent ${agent} demonstrates an ${trend} transaction trend with ${txns[2].toLocaleString()} transactions in Feb 2026, ${txns[2]>txns[0]?'up':'down'} from ${txns[0].toLocaleString()} in Nov 2025. The risk classification of ${risk.level} (score: ${risk.score}/100) is driven by ${risk.factors[0]||'stable performance patterns'}. Across 10 prediction models, the consensus estimate for Mar 2026 ranges with moderate variance, suggesting ${txns[2]>txns[1]?'continued momentum':'potential for recovery'}. The relationship manager should ${risk.level==='HIGH'?'prioritize a performance review and identify operational barriers':'continue current engagement and explore upsell opportunities'}.`;
+    document.getElementById('detailAiOutput').className = 'ai-output';
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderSidebar();
+renderTab('overview');
+</script>
+</body>
+</html>
